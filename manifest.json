@@ -1,0 +1,10 @@
+{
+	"id": "add-to-vault-plugin",
+	"name": "Add To Vault",
+	"version": "1.0.0",
+	"minAppVersion": "1.0.0",
+	"description": "Companion plugin to securely sync articles, summarize content with LLMs, and provide vault context to your self-hosted backend.",
+	"author": "Add To Vault",
+	"authorUrl": "",
+	"isDesktopOnly": false
+}
