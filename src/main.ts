@@ -13,6 +13,7 @@ interface AddToVaultSettings {
     geminiModel: string;
     availableModels: string[];
     templatePath: string;
+    useMultipass: boolean;
 }
 
 const DEFAULT_SETTINGS: AddToVaultSettings = {
@@ -23,7 +24,8 @@ const DEFAULT_SETTINGS: AddToVaultSettings = {
     geminiKey: '',
     geminiModel: '',
     availableModels: [],
-    templatePath: ''
+    templatePath: '',
+    useMultipass: false
 }
 
 // --- SUGGESTERS (AUTOCOMPLETE) ---
@@ -121,7 +123,6 @@ export default class AddToVaultPlugin extends Plugin {
                 let folderPath = this.settings.folderPath || '/';
                 const folder = this.app.vault.getAbstractFileByPath(folderPath);
                 
-                // Create folder if it doesn't exist
                 if (!folder && folderPath !== '/') {
                     try {
                         await this.app.vault.createFolder(folderPath);
@@ -156,9 +157,37 @@ export default class AddToVaultPlugin extends Plugin {
         }
 
         try {
-            // 1. Send Context (Filenames)
+            // 1. Send Context (Filenames + Tags)
             const files = this.app.vault.getMarkdownFiles();
-            const noteNames = files.map(file => file.basename);
+            const notesData = files.map(file => {
+                const cache = this.app.metadataCache.getFileCache(file);
+                let tags: string[] = [];
+
+                if (cache) {
+                    // Fetch from YAML Frontmatter
+                    if (cache.frontmatter && cache.frontmatter.tags) {
+                        const fmTags = cache.frontmatter.tags;
+                        if (Array.isArray(fmTags)) {
+                            tags.push(...fmTags);
+                        } else if (typeof fmTags === 'string') {
+                            tags.push(...fmTags.split(',').map(t => t.trim()));
+                        }
+                    }
+                    // Fetch inline tags (e.g., #tag in body)
+                    if (cache.tags) {
+                        tags.push(...cache.tags.map(t => t.tag));
+                    }
+                }
+
+                // Clean tags (remove # and duplicates)
+                const cleanTags = [...new Set(tags.map(t => t.replace(/^#/, '').trim()))].filter(t => t.length > 0);
+
+                return {
+                    path: file.basename,
+                    tags: cleanTags
+                };
+            });
+
             await requestUrl({
                 url: `${this.settings.apiUrl}/update-index`,
                 method: 'POST',
@@ -166,7 +195,7 @@ export default class AddToVaultPlugin extends Plugin {
                     'Authorization': `Bearer ${this.settings.apiToken}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ notes: noteNames })
+                body: JSON.stringify({ notes: notesData })
             });
 
             // 2. Read local template
@@ -186,7 +215,7 @@ export default class AddToVaultPlugin extends Plugin {
                 }
             }
 
-            // 3. Send Settings and Template
+            // 3. Send Settings, Template and Toggles
             if (this.settings.geminiKey) {
                 await requestUrl({
                     url: `${this.settings.apiUrl}/update-prefs`,
@@ -198,12 +227,13 @@ export default class AddToVaultPlugin extends Plugin {
                     body: JSON.stringify({
                         api_key: this.settings.geminiKey,
                         model: this.settings.geminiModel || "gemini-2.5-flash",
-                        prompt_template: templateContent
+                        prompt_template: templateContent,
+                        use_multipass: this.settings.useMultipass
                     })
                 });
             }
 
-            new Notice(`Success! Settings, template, and context synced.`);
+            new Notice(`Success! Settings, tags, template, and context synced.`);
         } catch (error) {
             console.error(error);
             new Notice('Sync error. Ensure your server is running and reachable.');
@@ -272,7 +302,7 @@ class AddToVaultSettingTab extends PluginSettingTab {
                         this.plugin.settings.availableModels = res.json.supported_models;
                         await this.plugin.saveSettings();
                         new Notice(`Success! Found ${this.plugin.settings.availableModels.length} models.`);
-                        this.display(); // Refresh to show dropdown
+                        this.display(); 
                     } catch (e) {
                         new Notice('Could not validate the key.');
                     }
@@ -319,10 +349,22 @@ class AddToVaultSettingTab extends PluginSettingTab {
                     });
             });
 
+        containerEl.createEl('h2', {text: 'Advanced Settings'});
+
+        new Setting(containerEl)
+            .setName('Multi-Pass LLM Context (Beta)')
+            .setDesc('When enabled, the server uses an extra LLM call to classify domain tags first, strictly isolating internal linking. Helps prevent irrelevant cross-linking.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.useMultipass)
+                .onChange(async (value) => {
+                    this.plugin.settings.useMultipass = value;
+                    await this.plugin.saveSettings();
+                }));
+
         containerEl.createEl('br');
         new Setting(containerEl)
             .setName('Manual Sync')
-            .setDesc('Push updated template, keys, and context to the server.')
+            .setDesc('Push updated template, keys, tags, and context to the server.')
             .addButton(btn => btn
                 .setButtonText('Sync Everything Now')
                 .setCta()
