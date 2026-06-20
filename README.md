@@ -1,4 +1,4 @@
-# Add To Vault (Obsidian Plugin)
+# Add To Vault *(Obsidian Plugin)*
 The official companion plugin for the self-hosted **[Add To Vault](https://github.com/epicylon/add-to-vault)** service. This plugin securely bridges your local Obsidian vault with your external AI processing server.
 
 **Transparency Notice:** *This project is "vibe-coded"*. The architecture, logic, and build configuration were primarily written by Google's Gemini Pro under the direction of a human project manager.
