@@ -1,0 +1,25 @@
+{
+  "name": "add-to-vault-plugin",
+  "version": "1.0.0",
+  "description": "Companion plugin for the Add To Vault self-hosted service.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production"
+  },
+  "keywords": [
+    "obsidian",
+    "plugin",
+    "ai",
+    "sync"
+  ],
+  "author": "Add To Vault",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^16.11.29",
+    "esbuild": "0.17.3",
+    "obsidian": "latest",
+    "tslib": "2.4.0",
+    "typescript": "4.5.2"
+  }
+}
