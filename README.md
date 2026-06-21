@@ -43,7 +43,7 @@ Navigate to the Add To Vault settings tab inside Obsidian to configure the conne
 
 2. **Get Your Token:** Once logged in, navigate to the Profile tab in the dashboard and click "Show / Hide Token". Copy this Bearer Token.
 
-3. **Obsidian Setup:** Paste the token into the "Server API Token" field in the plugin settings. Set your API URL (e.g., http://192.168.1.100:8000).
+3. **Obsidian Setup:** Paste the token into the "Server API Token" field in the plugin settings. Set your API URL (e.g., ```http://192.168.1.100:8000```).
 
 #### Other Settings
 - **LLM Providers:** Seamlessly switch the "brain" of your server between Google Gemini, OpenAI, Anthropic, Mistral AI, Kimi (Moonshot), or completely local Ollama instances. API keys are securely transmitted and stored on your own server.
