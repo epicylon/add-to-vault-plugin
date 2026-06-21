@@ -4,7 +4,7 @@ The companion plugin for the self-hosted **[Add To Vault](https://github.com/epi
 **Transparency Notice:** *This project is "vibe-coded"*. The architecture, logic, and build configuration were primarily written by Google's Gemini Pro under the direction of a human project manager.
 
 ## Overview
-This plugin sits quietly in your Obsidian vault to perform two main tasks: securely pushing your vault's index to the server (enabling context-aware AI linking), and periodically pulling newly generated markdown summaries from your self-hosted server directly into your local inbox.
+This plugin sits quietly in your Obsidian vault to perform two main tasks: securely pushing your vault's index to the server (enabling context-aware AI linking), and periodically pulling newly generated markdown summaries from your self-hosted server directly into your local vault.
 
 ## Installation
 You can install the Add To Vault plugin in two ways:
