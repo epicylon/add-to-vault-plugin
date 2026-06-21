@@ -14,16 +14,11 @@ It performs *two* main tasks:
 
 2. **Pulling Notes:** It periodically polls your server's secure inbox for newly generated markdown files, downloads them directly into your vault, and deletes them from the server.
 
-<div align="center">
-  <h3><a href="https://epicylon.github.io/add-to-vault/">Try out a demo simulation here</a></h3>
-</div>
-
 ### Prerequisites
-- An active, self-hosted instance of the Add To Vault Server. (Update link when ready)
 
-- A generated Bearer Token (found in your server's web dashboard under the "Profile" tab).
-
-- A Google Gemini API Key.
+* An active, self-hosted instance of the [Add To Vault backend](https://github.com/epicylon/add-to-vault/tree/main).
+* A generated Bearer Token *(found in your server's web dashboard under the "Profile" tab)*.
+* An API Key or local URL for your preferred LLM Provider *(Google Gemini, OpenAI, Anthropic, Mistral AI, Kimi, or Ollama)*.
 
 ### Manual Installation
 
@@ -50,15 +45,11 @@ Navigate to the Add To Vault settings tab inside Obsidian to configure the conne
 
 3. **Obsidian Setup:** Paste the token into the "Server API Token" field in the plugin settings. Set your API URL (e.g., http://192.168.1.100:8000).
 
-#### Other Settings:
-
-- **Gemini API Key:** Your Google AI Studio key. (Note: This is securely transmitted and stored on your own server).
-
-- **LLM Model:** Select your preferred model (e.g., gemini-2.5-flash).
-
+#### Other Settings
+- **LLM Providers:** Seamlessly switch the "brain" of your server between Google Gemini, OpenAI, Anthropic, Mistral AI, Kimi (Moonshot), or completely local Ollama instances. API keys are securely transmitted and stored on your own server.
+- **Model Validation:** Enter your API key (or local URL for Ollama) and click "Validate" to automatically fetch and select from the latest supported models.
 - **Inbox Folder:** The local folder where new notes should be saved.
-
-- **LLM Prompt Templates:** Point to local .md files for Archivist, Analyst, and Synthesist modes. Variables supported: {title}, {url}, {content}, {vault_context}.
+- **LLM Prompt Templates:** Point to local `.md` files for Archivist, Analyst, and Synthesist modes. Variables supported: `{title}`, `{url}`, `{content}`, `{vault_context}`.
 
 ### Development
 
