@@ -26,6 +26,13 @@ interface AddToVaultSettings {
     useMultipass: boolean;
 }
 
+// Legacy settings from versions before multi-provider support
+interface LegacySettings {
+    geminiKey?: string;
+    geminiModel?: string;
+    templatePath?: string;
+}
+
 interface VaultNote {
     path: string;
     tags: string[];
@@ -167,7 +174,7 @@ export default class AddToVaultPlugin extends Plugin {
 
     async loadSettings() {
         const rawLoaded = await this.loadData();
-        const loaded: Partial<AddToVaultSettings> = rawLoaded ?? {};
+        const loaded = (rawLoaded ?? {}) as Partial<AddToVaultSettings> & LegacySettings;
         const settings = Object.assign({}, DEFAULT_SETTINGS, loaded) as AddToVaultSettings;
 
         // Deep merge nested provider dictionaries so new providers get default empty strings
@@ -352,8 +359,7 @@ class AddToVaultSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
-    // eslint-disable-next-line @typescript-eslint/require-await
-    async display(): Promise<void> {
+    display(): void {
         const {containerEl} = this;
         containerEl.empty();
 
@@ -463,8 +469,8 @@ class AddToVaultSettingTab extends PluginSettingTab {
                             this.plugin.settings.availableModels = []; // Reset models on switch
                             await this.plugin.saveSettings();
                         }
-                        // Always re-render to enforce single-active-provider UI state
-                        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                        // Re-render to enforce single-active-provider UI state.
+                        // void because PluginSettingTab.display() returns void, not Promise.
                         void this.display();
                     })
                 );
@@ -499,7 +505,7 @@ class AddToVaultSettingTab extends PluginSettingTab {
                                 this.plugin.settings.availableModels = data.supported_models;
                                 await this.plugin.saveSettings();
                                 new Notice(`Success! Found ${this.plugin.settings.availableModels.length} models.`);
-                                // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                                // Re-render to show model dropdown. void because display() returns void.
                                 void this.display(); 
                             } catch {
                                 new Notice(`Could not validate the key/URL for ${p.name}.`);
