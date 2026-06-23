@@ -1,6 +1,6 @@
 {
   "name": "add-to-vault-plugin",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Companion plugin for the Add To Vault self-hosted service.",
   "main": "main.js",
   "scripts": {
