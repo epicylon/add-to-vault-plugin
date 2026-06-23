@@ -1,8 +1,8 @@
 {
 	"id": "add-to-vault",
 	"name": "Add To Vault",
-	"version": "1.0.0",
-	"minAppVersion": "1.0.0",
+	"version": "1.0.1",
+	"minAppVersion": "1.13.0",
 	"description": "Companion plugin to securely sync articles, summarize content with LLMs, and provide vault context to your self-hosted backend.",
 	"author": "CLINCH",
 	"authorUrl": "https://github.com/epicylon",
