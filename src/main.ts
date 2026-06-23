@@ -3,6 +3,9 @@ import {
     requestUrl, TFile, TFolder, AbstractInputSuggest 
 } from 'obsidian';
 
+// NOTE: AbstractInputSuggest requires Obsidian API >= 1.13.0
+// Ensure manifest.json has: "minAppVersion": "1.13.0"
+
 // --- INTERFACES ---
 interface AddToVaultSettings {
     apiUrl: string;
@@ -21,6 +24,17 @@ interface AddToVaultSettings {
     templateAnalyst: string;
     templateSynthesist: string;
     useMultipass: boolean;
+}
+
+interface VaultNote {
+    path: string;
+    tags: string[];
+}
+
+interface ProviderInfo {
+    id: string;
+    name: string;
+    desc: string;
 }
 
 const DEFAULT_SETTINGS: AddToVaultSettings = {
@@ -54,7 +68,7 @@ const DEFAULT_SETTINGS: AddToVaultSettings = {
     useMultipass: false
 }
 
-const PROVIDERS = [
+const PROVIDERS: ProviderInfo[] = [
     { id: 'gemini', name: 'Google Gemini', desc: 'Google AI Studio API Key' },
     { id: 'openai', name: 'OpenAI', desc: 'OpenAI API Key' },
     { id: 'anthropic', name: 'Anthropic', desc: 'Anthropic API Key' },
@@ -136,31 +150,31 @@ export default class AddToVaultPlugin extends Plugin {
 
         if (this.settings.syncInterval > 0) {
             this.registerInterval(window.setInterval(() => {
-                this.fetchInbox();
+                void this.fetchInbox();
             }, this.settings.syncInterval * 60 * 1000));
         }
     }
 
     async loadSettings() {
-        const loaded = await this.loadData();
+        const loaded: Partial<AddToVaultSettings> = await this.loadData() ?? {};
         const settings = Object.assign({}, DEFAULT_SETTINGS, loaded) as AddToVaultSettings;
 
         // Deep merge nested provider dictionaries so new providers get default empty strings
-        if (loaded?.apiKeys) {
+        if (loaded.apiKeys) {
             settings.apiKeys = { ...DEFAULT_SETTINGS.apiKeys, ...loaded.apiKeys };
         }
-        if (loaded?.selectedModels) {
+        if (loaded.selectedModels) {
             settings.selectedModels = { ...DEFAULT_SETTINGS.selectedModels, ...loaded.selectedModels };
         }
 
         // --- MIGRATION from old single-provider settings ---
-        if (loaded?.geminiKey && !settings.apiKeys.gemini) {
+        if (loaded.geminiKey && !settings.apiKeys.gemini) {
             settings.apiKeys.gemini = loaded.geminiKey;
         }
-        if (loaded?.geminiModel && !settings.selectedModels.gemini) {
+        if (loaded.geminiModel && !settings.selectedModels.gemini) {
             settings.selectedModels.gemini = loaded.geminiModel;
         }
-        if (loaded?.templatePath && !settings.templateAnalyst) {
+        if (loaded.templatePath && !settings.templateAnalyst) {
             settings.templateAnalyst = loaded.templatePath;
         }
 
@@ -178,10 +192,10 @@ export default class AddToVaultPlugin extends Plugin {
             const response = await requestUrl({
                 url: `${baseUrl}/inbox`,
                 method: 'GET',
-                headers: { 'Authorization': `Bearer ${this.settings.apiToken}` }
+                headers: { 'Authorization': `Bearer ${this.settings.apiToken.trim()}` }
             });
 
-            const data = response.json;
+            const data = response.json as { items?: { filename: string; content: string }[] };
             if (!data.items || data.items.length === 0) return;
 
             let processed = 0;
@@ -191,7 +205,7 @@ export default class AddToVaultPlugin extends Plugin {
 
                 if (!folder && folderPath !== '/') {
                     try { await this.app.vault.createFolder(folderPath); } 
-                    catch(e) { console.error('Could not create folder:', e); }
+                    catch(_err) { console.error('Could not create folder:', _err); }
                 }
 
                 let filePath = folderPath === '/' ? item.filename : `${folderPath}/${item.filename}`;
@@ -202,7 +216,7 @@ export default class AddToVaultPlugin extends Plugin {
                     await requestUrl({
                         url: `${baseUrl}/inbox/${encodeURIComponent(item.filename)}`,
                         method: 'DELETE',
-                        headers: { 'Authorization': `Bearer ${this.settings.apiToken}` }
+                        headers: { 'Authorization': `Bearer ${this.settings.apiToken.trim()}` }
                     });
                     processed++;
                 }
@@ -236,7 +250,7 @@ export default class AddToVaultPlugin extends Plugin {
         try {
             // 1. Send Context (Filenames + Tags)
             const files = this.app.vault.getMarkdownFiles();
-            const notesData = files.map(file => {
+            const notesData: VaultNote[] = files.map(file => {
                 const cache = this.app.metadataCache.getFileCache(file);
                 let tags: string[] = [];
 
@@ -244,9 +258,9 @@ export default class AddToVaultPlugin extends Plugin {
                     if (cache.frontmatter && cache.frontmatter.tags) {
                         const fmTags = cache.frontmatter.tags;
                         if (Array.isArray(fmTags)) {
-                            tags.push(...fmTags);
+                            tags.push(...fmTags.map(t => String(t)));
                         } else if (typeof fmTags === 'string') {
-                            tags.push(...fmTags.split(',').map(t => String(t).trim()));
+                            tags.push(...fmTags.split(',').map(t => t.trim()));
                         }
                     }
                     if (cache.tags) {
@@ -264,7 +278,7 @@ export default class AddToVaultPlugin extends Plugin {
                 url: `${baseUrl}/update-index`,
                 method: 'POST',
                 headers: { 
-                    'Authorization': `Bearer ${this.settings.apiToken}`,
+                    'Authorization': `Bearer ${this.settings.apiToken.trim()}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ notes: notesData })
@@ -282,7 +296,7 @@ export default class AddToVaultPlugin extends Plugin {
 
             // Build payload: only include templates that have content.
             // Always include prompt_template as a fallback for the backend.
-            const payload: Record<string, any> = {
+            const payload: Record<string, string | boolean> = {
                 api_key: activeKey,
                 provider: activeProvider,
                 model: activeModel,
@@ -298,16 +312,21 @@ export default class AddToVaultPlugin extends Plugin {
                 url: `${baseUrl}/update-prefs`,
                 method: 'POST',
                 headers: { 
-                    'Authorization': `Bearer ${this.settings.apiToken}`,
+                    'Authorization': `Bearer ${this.settings.apiToken.trim()}`,
                     'Content-Type': 'application/json' 
                 },
                 body: JSON.stringify(payload)
             });
 
             new Notice(`Success! Settings, templates, tags, and context synced.`);
-        } catch (error) {
+        } catch (error: unknown) {
             console.error('Push Context Error:', error);
-            new Notice('Sync error. Open developer console (Ctrl+Shift+I) for details.');
+            const err = error as { status?: number };
+            if (err.status === 401) {
+                new Notice('Authentication failed (401). Your token may have expired. Please log in via the web UI and copy the new token.');
+            } else {
+                new Notice('Sync error. Open developer console (Ctrl+Shift+I) for details.');
+            }
         }
     }
 }
@@ -326,7 +345,7 @@ class AddToVaultSettingTab extends PluginSettingTab {
         containerEl.empty();
 
         // --- 1. SERVER ---
-        containerEl.createEl('h2', {text: 'Server'});
+        new Setting(containerEl).setName('Server').setHeading();
 
         new Setting(containerEl)
             .setName('API URL')
@@ -344,7 +363,7 @@ class AddToVaultSettingTab extends PluginSettingTab {
             .addText(text => text
                 .setValue(this.plugin.settings.apiToken)
                 .onChange(async (value) => {
-                    this.plugin.settings.apiToken = value;
+                    this.plugin.settings.apiToken = value.trim();
                     await this.plugin.saveSettings();
                 }));
 
@@ -359,7 +378,7 @@ class AddToVaultSettingTab extends PluginSettingTab {
                 }));
 
         // --- 2. FOLDERS ---
-        containerEl.createEl('h2', {text: 'Folders'});
+        new Setting(containerEl).setName('Folders').setHeading();
 
         new Setting(containerEl)
             .setName('Inbox Folder')
@@ -374,7 +393,7 @@ class AddToVaultSettingTab extends PluginSettingTab {
             });
 
         // --- 3. PROCESSING MODE TEMPLATES ---
-        containerEl.createEl('h2', {text: 'Processing Mode Templates'});
+        new Setting(containerEl).setName('Processing Mode Templates').setHeading();
         containerEl.createEl('p', {text: 'Configure the .md files defining the prompt for each mode. Variables: {title}, {url}, {content}, {vault_context}.', cls: 'setting-item-description'});
 
         new Setting(containerEl)
@@ -414,7 +433,7 @@ class AddToVaultSettingTab extends PluginSettingTab {
             });
 
         // --- 4. LLM PROVIDERS ---
-        containerEl.createEl('h2', {text: 'LLM Providers'});
+        new Setting(containerEl).setName('LLM Providers').setHeading();
         containerEl.createEl('p', {text: 'Toggle the provider you want to use. Keys are saved securely. You must validate the key to select a model.', cls: 'setting-item-description'});
 
         PROVIDERS.forEach(p => {
@@ -462,11 +481,11 @@ class AddToVaultSettingTab extends PluginSettingTab {
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ provider: p.id, api_key: keyToValidate })
                                 });
-                                this.plugin.settings.availableModels = res.json.supported_models;
+                                this.plugin.settings.availableModels = res.json.supported_models as string[];
                                 await this.plugin.saveSettings();
                                 new Notice(`Success! Found ${this.plugin.settings.availableModels.length} models.`);
                                 this.display(); 
-                            } catch (e) {
+                            } catch (_err) {
                                 new Notice(`Could not validate the key/URL for ${p.name}.`);
                             }
                             btn.setButtonText('Validate Key');
@@ -486,7 +505,7 @@ class AddToVaultSettingTab extends PluginSettingTab {
                             } else {
                                 drop.setValue(this.plugin.settings.availableModels[0]);
                                 this.plugin.settings.selectedModels[p.id] = this.plugin.settings.availableModels[0];
-                                this.plugin.saveSettings(); // fire-and-forget is acceptable here
+                                void this.plugin.saveSettings(); // fire-and-forget during render
                             }
 
                             drop.onChange(async (value) => {
@@ -499,7 +518,7 @@ class AddToVaultSettingTab extends PluginSettingTab {
         });
 
         // --- 5. ADVANCED SETTINGS ---
-        containerEl.createEl('h2', {text: 'Advanced Settings'});
+        new Setting(containerEl).setName('Advanced Settings').setHeading();
 
         new Setting(containerEl)
             .setName('Multi-Pass LLM Context (Recommended)')
