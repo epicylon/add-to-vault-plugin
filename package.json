@@ -1,6 +1,6 @@
 {
   "name": "add-to-vault-plugin",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Companion plugin for the Add To Vault self-hosted service.",
   "main": "main.js",
   "scripts": {
@@ -20,7 +20,7 @@
     "esbuild": "0.17.3",
     "obsidian": "latest",
     "tslib": "2.4.0",
-    "typescript": "4.5.2"
+    "typescript": "4.5.2",
     "builtin-modules": "^3.3.0"
   }
 }
