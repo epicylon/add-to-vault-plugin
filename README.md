@@ -65,6 +65,8 @@ To build this plugin from source:
 
 The project consists of a **FastAPI** backend utilizing **SQLAlchemy** *(SQLite)* for user management. Web scraping is handled via **BeautifulSoup4**. LLM interactions are orchestrated through **LangChain**. The frontend is a single-page HTML application styled with **Tailwind CSS**, served directly by FastAPI.
 
+This plugin enumerates your vault's markdown files to build a context index for the LLM. **No file content is uploaded** — only filenames and tags are sent to your self-hosted backend.
+
 <div align="center">
   <a href="https://www.buymeacoffee.com/clinch">
     <img src="https://github.com/epicylon/add-to-vault/blob/demo/scr/blue-button.png?raw=true" alt="Buy Me A Coffee" width="200" />
