@@ -37,6 +37,14 @@ interface ProviderInfo {
     desc: string;
 }
 
+interface ValidateResponse {
+    supported_models: string[];
+}
+
+interface InboxResponse {
+    items?: { filename: string; content: string }[];
+}
+
 const DEFAULT_SETTINGS: AddToVaultSettings = {
     apiUrl: 'http://192.168.100.11:8000',
     apiToken: '',
@@ -100,9 +108,10 @@ class FileSuggest extends AbstractInputSuggest<TFile> {
         el.setText(file.path);
     }
     selectSuggestion(file: TFile): void {
-        if (this.textInputEl) {
-            this.textInputEl.value = file.path;
-            this.textInputEl.dispatchEvent(new Event('input'));
+        const inputEl = this.textInputEl as HTMLInputElement;
+        if (inputEl) {
+            inputEl.value = file.path;
+            inputEl.dispatchEvent(new Event('input'));
         }
         this.close();
     }
@@ -120,9 +129,10 @@ class FolderSuggest extends AbstractInputSuggest<TFolder> {
         el.setText(folder.path === '/' ? 'Root (Main folder)' : folder.path);
     }
     selectSuggestion(folder: TFolder): void {
-        if (this.textInputEl) {
-            this.textInputEl.value = folder.path === '/' ? '' : folder.path;
-            this.textInputEl.dispatchEvent(new Event('input'));
+        const inputEl = this.textInputEl as HTMLInputElement;
+        if (inputEl) {
+            inputEl.value = folder.path === '/' ? '' : folder.path;
+            inputEl.dispatchEvent(new Event('input'));
         }
         this.close();
     }
@@ -156,7 +166,8 @@ export default class AddToVaultPlugin extends Plugin {
     }
 
     async loadSettings() {
-        const loaded: Partial<AddToVaultSettings> = await this.loadData() ?? {};
+        const rawLoaded = await this.loadData();
+        const loaded: Partial<AddToVaultSettings> = rawLoaded ?? {};
         const settings = Object.assign({}, DEFAULT_SETTINGS, loaded) as AddToVaultSettings;
 
         // Deep merge nested provider dictionaries so new providers get default empty strings
@@ -195,7 +206,7 @@ export default class AddToVaultPlugin extends Plugin {
                 headers: { 'Authorization': `Bearer ${this.settings.apiToken.trim()}` }
             });
 
-            const data = response.json as { items?: { filename: string; content: string }[] };
+            const data = response.json as InboxResponse;
             if (!data.items || data.items.length === 0) return;
 
             let processed = 0;
@@ -205,7 +216,7 @@ export default class AddToVaultPlugin extends Plugin {
 
                 if (!folder && folderPath !== '/') {
                     try { await this.app.vault.createFolder(folderPath); } 
-                    catch(_err) { console.error('Could not create folder:', _err); }
+                    catch { /* folder may already exist */ }
                 }
 
                 let filePath = folderPath === '/' ? item.filename : `${folderPath}/${item.filename}`;
@@ -255,8 +266,9 @@ export default class AddToVaultPlugin extends Plugin {
                 let tags: string[] = [];
 
                 if (cache) {
-                    if (cache.frontmatter && cache.frontmatter.tags) {
-                        const fmTags = cache.frontmatter.tags;
+                    const frontmatter = cache.frontmatter as Record<string, unknown> | undefined;
+                    if (frontmatter && frontmatter.tags) {
+                        const fmTags = frontmatter.tags;
                         if (Array.isArray(fmTags)) {
                             tags.push(...fmTags.map(t => String(t)));
                         } else if (typeof fmTags === 'string') {
@@ -340,7 +352,8 @@ class AddToVaultSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
-    display(): void {
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async display(): Promise<void> {
         const {containerEl} = this;
         containerEl.empty();
 
@@ -451,7 +464,8 @@ class AddToVaultSettingTab extends PluginSettingTab {
                             await this.plugin.saveSettings();
                         }
                         // Always re-render to enforce single-active-provider UI state
-                        this.display();
+                        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                        void this.display();
                     })
                 );
 
@@ -481,11 +495,13 @@ class AddToVaultSettingTab extends PluginSettingTab {
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ provider: p.id, api_key: keyToValidate })
                                 });
-                                this.plugin.settings.availableModels = res.json.supported_models as string[];
+                                const data = res.json as ValidateResponse;
+                                this.plugin.settings.availableModels = data.supported_models;
                                 await this.plugin.saveSettings();
                                 new Notice(`Success! Found ${this.plugin.settings.availableModels.length} models.`);
-                                this.display(); 
-                            } catch (_err) {
+                                // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                                void this.display(); 
+                            } catch {
                                 new Notice(`Could not validate the key/URL for ${p.name}.`);
                             }
                             btn.setButtonText('Validate Key');
@@ -496,7 +512,9 @@ class AddToVaultSettingTab extends PluginSettingTab {
                     new Setting(containerEl)
                         .setName('Select LLM Model')
                         .addDropdown(drop => {
-                            this.plugin.settings.availableModels.forEach(m => drop.addOption(m, m));
+                            for (const m of this.plugin.settings.availableModels) {
+                                drop.addOption(m, m);
+                            }
 
                             // Set to previously saved model or default to the first one available
                             const currentModel = this.plugin.settings.selectedModels[p.id];
@@ -517,8 +535,8 @@ class AddToVaultSettingTab extends PluginSettingTab {
             }
         });
 
-        // --- 5. ADVANCED SETTINGS ---
-        new Setting(containerEl).setName('Advanced Settings').setHeading();
+        // --- 5. ADVANCED ---
+        new Setting(containerEl).setName('Advanced').setHeading();
 
         new Setting(containerEl)
             .setName('Multi-Pass LLM Context (Recommended)')
